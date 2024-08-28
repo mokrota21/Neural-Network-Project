@@ -2,34 +2,28 @@ class NeuralNetwork:
     def __init__(self, layers, rate) -> None:
         self.alpha_ = rate
         self.layers_ = layers
-    
-    def forward (self, x):
-        outputs = [x]
+
+    def forward(self, x):
+        out = [x]
         for layer in self.layers_:
-            outputs.append(layer.forward(outputs[-1]))
-        return outputs
+            out.append(layer.forward(out[-1]))
+        return out
+    
+    def backward(self, outputs, y_real):
+        y = outputs[-1]
+        n = y_real.shape[0]
+        mse = y_real - y
+        mse = (mse * mse).sum() / n
 
-    def backward(self, outputs, y, y_real):
-        mse = 0
-        de = 0
-        n = y.shape[0]
-
-        mse = ((y_real - y) * (y_real - y)).sum() / n
-        de = 2 * (y - y_real) / n
+        de = 2 / n * (y - y_real)
 
         for i in reversed(range(len(self.layers_))):
             layer = self.layers_[i]
             x = outputs[i]
-            print(f"Error derrivative: {de}")
             de = layer.backward(de, x, self.alpha_)
-
-        # for layer in self.layers_[::-1]:
-        #     de = layer.backward(de, x, self.alpha_)
-        
         return mse
-
+    
     def train(self, x_set, y_set):
-        # every input has output
         assert len(x_set) == len(y_set)
 
         for i in range(len(x_set)):
@@ -37,14 +31,16 @@ class NeuralNetwork:
             x = x_set[i]
             
             outputs = self.forward(x)
-            y = outputs[-1]
-            print(f"MSE: {self.backward(outputs, y, y_real)};{' ' * 20}Learning rate: {self.alpha_}")
+            print(outputs)
+            print(f"MSE: {self.backward(outputs, y_real)};{' ' * 20}Learning rate: {self.alpha_}")
 
+        # for layer in self.layers_:
+        #     print(layer.w_)
         return True
-
+    
     def predict(self, x):
         current = x
         for layer in self.layers_:
             current = layer.forward(current)
         return current
-        
+    
