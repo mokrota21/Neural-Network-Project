@@ -10,9 +10,11 @@ class NeuralNetwork:
         return out
     
     def backward(self, outputs, y_real):
+        # print(outputs)
         y = outputs[-1]
         n = y_real.shape[0]
         mse = y_real - y
+        # print(y_real, y, n)
         mse = (mse * mse).sum() / n
 
         de = 2 / n * (y - y_real)
@@ -26,21 +28,23 @@ class NeuralNetwork:
     def train(self, x_set, y_set):
         assert len(x_set) == len(y_set)
 
+        avg_mse = 0
+
         for i in range(len(x_set)):
             y_real = y_set[i]
             x = x_set[i]
             
             outputs = self.forward(x)
-            print(outputs)
-            print(f"MSE: {self.backward(outputs, y_real)};{' ' * 20}Learning rate: {self.alpha_}")
+            # print(outputs)
+            # print(f"MSE: {self.backward(outputs, y_real)};{' ' * 20}Learning rate: {self.alpha_}")
+            avg_mse += self.backward(outputs, y_real)
 
-        # for layer in self.layers_:
-        #     print(layer.w_)
-        return True
+        return avg_mse / len(x_set)
     
     def predict(self, x):
         current = x
         for layer in self.layers_:
             current = layer.forward(current)
         return current
+        
     
