@@ -1,5 +1,6 @@
 from math import tanh, log, exp
 import numpy as np
+from layer import Layer
 
 def tanh_prime(x):
     return 1 - tanh(x) ** 2
@@ -16,7 +17,7 @@ def softPlus_np(x):
 def softPlus_np_prime(x):
     return 1.0 / (1 + np.exp(-1 * x))
 
-class ActivationLayer:
+class ActivationLayer(Layer):
     def __init__(self, activation, activation_prime, vectorized=False) -> None:
         if not vectorized:
             activation = np.vectorize(activation)
@@ -28,5 +29,5 @@ class ActivationLayer:
     def forward(self, x):
         return self.activation_(x)
     
-    def backward(self, de, x, rate):
+    def backward(self, de, x, rate, gamma):
         return de * self.activation_prime_(x)
