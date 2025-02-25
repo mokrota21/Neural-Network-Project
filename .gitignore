@@ -1,3 +1,4 @@
 .venv
 project/model/
-**/data*/  
+**/data*/
+*.pth
