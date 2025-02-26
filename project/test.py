@@ -14,7 +14,7 @@ device = torch.device("cuda")
 batch_size = 32
 cur_path = os.path.abspath(__file__)
 test_path = os.path.join(dir_path, 'data', 'test')
-save_path = os.path.join(dir_path, 'model', 'cnn.pth')
+save_path = os.path.join(dir_path, 'model', 'training_pyramid0', 'cnn_-8_12_12_best.pth')
 to_tensor = transforms.Compose([
     transforms.Grayscale(num_output_channels=1), transforms.ToTensor()
 ])
@@ -27,7 +27,7 @@ testloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 label_mapping = [chr(ord('a') + i) for i in range(0, 26)]
 
-conv_net = ConvNetPooling(height=height, width=width, output=output_size).to(device)
+conv_net = ConvNetPooling(height=height, width=width, output=output_size, channels=[12, 12]).to(device)
 conv_net.load_state_dict(torch.load(save_path, map_location=device, weights_only=True))
 
 label_score = {}

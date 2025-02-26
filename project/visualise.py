@@ -14,9 +14,18 @@ import matplotlib.pyplot as plt
 import torchvision.transforms.functional as F
 
 device = torch.device("cuda")
-batch_size = 5
+batch_size = 50
 cur_path = os.path.abspath(__file__)
-train_path = os.path.join(dir_path, 'data', 'train')
+model_path = os.path.join(dir_path, 'model')
+file_name = ""
+for file in os.listdir(model_path):
+    if file.endswith("best.pth"):
+        file_name = file
+        tmp = file_name.split('_')
+        layers = [int(tmp[-3]), int(tmp[-2])]
+        break
+model_path = os.path.join(model_path, file_name)
+print(f"Using best model: {file_name}")
 
 output_prefix = "emnist"
 save_path = os.path.join(dir_path, 'predictions')
@@ -43,10 +52,12 @@ print(sample_label)
 _, width, height = list(sample_image.shape)
 trainloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-conv_net = ConvNetPooling(width=width, height=height, output=output_size)
+conv_net = ConvNetPooling(width=width, height=height, output=output_size, channels=layers)
+conv_net.load_state_dict(torch.load(model_path, weights_only=True))
 dataiter = iter(trainloader)
 images, labels = next(dataiter)
-conv_out = conv_net.show_conv(images, index=0)  # shape: [batch_size, 4, H, W]
+images = images.to(device)
+conv_out = conv_net.show_conv(images)  # shape: [batch_size, 4, H, W]
 
 for image in range(conv_out[0].shape[0]):
     counter = 0
