@@ -48,8 +48,7 @@ output_size = len(set(labels))
 sample_image, _ = dataset[0]
 _, width, height = list(sample_image.shape)
 
-# conv_networks_parameters = [torch.randint(4, 16, (2,)).sort(descending=False).values for _ in range(validation_counter)] # increasing pyramid
-conv_networks_parameters = [torch.randint(4, 16, (2,)).sort(descending=descending) .values for _ in range(validation_counter)] # decreasing pyramid
+conv_networks_parameters = [torch.randint(4, 16, (2,)).sort(descending=descending) .values for _ in range(validation_counter)]
 
 conv_networks = []
 for parameter in conv_networks_parameters:
@@ -63,7 +62,7 @@ best_model = None
 best_accuracy = None
 best_model_no = None
 
-losses_list = []
+losses_list = {}
 
 for model_no, (conv_network, alpha) in enumerate(zip(conv_networks, alphas)):
     optimizer = torch.optim.Adam(params=conv_network.parameters(), lr=alpha)
