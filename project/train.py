@@ -1,7 +1,7 @@
 
 import os
 cur_path = os.path.abspath(__file__)
-dir_path = os.path.join(cur_path, '..')
+dir_path = os.path.dirname(cur_path)
 os.chdir(dir_path)
 
 from architecture import ConvNetPooling, nn
@@ -10,16 +10,15 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder, EMNIST
 import torchvision.transforms as transforms
 import pandas as pd
-torch.manual_seed(162179)
+import json
 
-def get_unique_folder(path, folder_name):
+def get_unique_path(path, name, suffix=""):
     counter = 0
-    folder_path = os.path.join(path, folder_name + str(counter))
-    while os.path.exists(folder_path):
+    new_path = os.path.join(path, name + str(counter) + suffix)
+    while os.path.exists(new_path):
         counter += 1
-        folder_path = os.path.join(path, folder_name + str(counter))
-    os.mkdir(folder_path)
-    return folder_path
+        new_path = os.path.join(path, name + str(counter) + suffix)
+    return new_path
 
 descending = True
 device = torch.device("cuda")
@@ -32,43 +31,83 @@ if descending:
     folder_name += "_pyramid"
 else:
     folder_name += "_reverse_pyramid"
-save_path = get_unique_folder(save_path, folder_name)
+save_path = get_unique_path(save_path, folder_name)
+os.mkdir(save_path)
 loss_path = os.path.join(save_path, "loss.json")
 
 to_tensor = transforms.Compose([
     transforms.Grayscale(num_output_channels=1), transforms.ToTensor()
 ])
 dataset = EMNIST(root="data_emnist", split="letters", train=True, transform=to_tensor)
+
+torch.manual_seed(162179)
 train_dataset, validation_dataset = torch.utils.data.random_split(dataset, [0.8, 0.2])
 trainloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 validationloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False)
+
+def set_train_val(batch_size, split=[0.8, 0.2], seed=None):
+    if seed:
+        torch.manual_seed(seed)
+    train_dataset, validation_dataset = torch.utils.data.random_split(dataset, split)
+    trainloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    validationloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False)
+    return trainloader, validationloader
 
 labels = [label for _, label in dataset]
 output_size = len(set(labels))
 sample_image, _ = dataset[0]
 _, width, height = list(sample_image.shape)
 
-conv_networks_parameters = [torch.randint(4, 16, (2,)).sort(descending=descending) .values for _ in range(validation_counter)]
+def models_rand(n, channel_low, channel_high, exp_low, exp_high, width=width, height=height):
+    conv_networks_parameters = [torch.randint(channel_low, channel_high, (2,)).sort(descending=descending).values for _ in range(n)]
+    conv_networks = []
+    for parameter in conv_networks_parameters:
+        conv_networks.append(ConvNetPooling(height=height, width=width, output=output_size, channels=parameter.tolist()).cuda())
 
-conv_networks = []
-for parameter in conv_networks_parameters:
-    conv_networks.append(ConvNetPooling(height=height, width=width, output=output_size, channels=parameter).cuda())
-exp_powers = torch.randint(-13, -4, (validation_counter,))
-alphas = exp_powers.exp2()
+    exp_powers = torch.randint(exp_low, exp_high, (n,))
+    alphas = exp_powers.exp2().tolist()
 
-epochs = 10
-mse = nn.CrossEntropyLoss()
-best_model = None
-best_accuracy = None
-best_model_no = None
+    return conv_networks, alphas
 
-losses_list = {}
 
-for model_no, (conv_network, alpha) in enumerate(zip(conv_networks, alphas)):
-    optimizer = torch.optim.Adam(params=conv_network.parameters(), lr=alpha)
+
+def validation(model: ConvNetPooling, validationloader=validationloader, save_folder=save_path, seed=None):
+    if seed:
+        torch.manual_seed(seed)
+    predicted = torch.tensor(data=[]).to(device)
+    gt = torch.tensor(data=[]).to(device)
+
+    with torch.no_grad():
+        for i, data in enumerate(validationloader, 0):
+            image, label = data
+            label = (label - 1).to(device)
+            image = image.to(device)
+
+            outputs = model(image).to(device)
+            batch_predictions = outputs.argmax(1).flatten()
+            batch_gt = label.flatten()
+
+            predicted = torch.cat((predicted, batch_predictions))
+            gt = torch.cat((gt, batch_gt))
+    
+    result = {
+        "predicted": predicted.tolist(),
+        "expected": gt.tolist()
+    }
+    if save_folder:
+        path = "validation"
+        path = get_unique_path(save_folder, path, suffix=".json")
+        with open(path, 'w') as f:
+            f.write(json.dumps(result))
+    return result
+
+def train(model: ConvNetPooling, hyperparams, trainloader=trainloader, validationloader=validationloader, save_folder=save_path, epochs=10, seed=None):
+    if seed:
+        torch.manual_seed(seed)
+    mse = nn.CrossEntropyLoss()
+
+    optimizer = torch.optim.Adam(params=model.parameters(), **hyperparams)
     loss_list = []
-    # training
-    print(f"TRAINING {model_no}")
     for epoch in range(epochs):
         running_loss = 0.0
         trainloader
@@ -78,7 +117,7 @@ for model_no, (conv_network, alpha) in enumerate(zip(conv_networks, alphas)):
             image = image.to(device)
 
             optimizer.zero_grad()
-            outputs = conv_network(image).to(device)
+            outputs = model(image).to(device)
             # print(label)
             # print(outputs)
             loss = mse(outputs, label)
@@ -89,42 +128,32 @@ for model_no, (conv_network, alpha) in enumerate(zip(conv_networks, alphas)):
             if i % 100 == 99:
                 print(f"Epoch {epoch + 1}, batch {i + 1}, loss {running_loss / 100:.3f}")
                 running_loss = 0.0
-    # validating
-    losses_list.append(loss_list)
-    print(f"VALIDATION {model_no}")
-    correct = 0.0
-    total = 0.0
-    with torch.no_grad():
-        for i, data in enumerate(trainloader, 0):
-            image, label = data
-            label = (label - 1).to(device)
-            image = image.to(device)
 
-            optimizer.zero_grad()
-            outputs = conv_network(image).to(device)
-            # print(label)
-            # print(outputs)
-            outputs = outputs.argmax(1)
-            correct += (label == outputs).sum().item()
-            total += label.shape[0]
-            if i % 100 == 99:
-                print(f"Epoch {epoch + 1}, batch {i + 1}, accuracy {correct / total * 100:.3f}")
-        if best_accuracy is None or best_accuracy < correct / total:
-            best_accuracy = correct / total
-            best_model = conv_network
-            best_model_no = model_no
+    if save_folder:
+        model_path = "cnn"
+        model_path = get_unique_path(save_folder, model_path, suffix=".pth")
+        torch.save(model.state_dict(), model_path)
 
-print("Saving losses")
-import json
-with open(loss_path, 'a') as file:
-    file.write(json.dumps(losses_list) + '\n')
-print(f"Best model is model with channels {conv_networks_parameters[best_model_no]} and alpha rate of {alphas[best_model_no]} with loss: {best_accuracy}")
-for i, model in enumerate(conv_networks):
-    layers = conv_networks_parameters[i]
-    alpha = exp_powers[i]
-    if i != best_model_no:
-        file_name = f"cnn_{int(alpha)}_{int(layers[0])}_{int(layers[1])}.pth"
-    else:
-        file_name = f"cnn_{int(alpha)}_{int(layers[0])}_{int(layers[1])}_best.pth"
-    torch.save(model.state_dict(), os.path.join(save_path, file_name))
+        loss_path = "loss"
+        loss_path = get_unique_path(save_folder, loss_path, suffix=".json")
+        with open(loss_path, 'w') as f:
+            f.write(json.dumps(loss_list))
+
+        validation_path = "validation"
+        validation_path = get_unique_path(save_folder, validation_path, suffix=".json")
+        validation(model, validationloader, save_folder, seed=seed)
+
+        metadata = {
+            "model": os.path.basename(model_path),
+            "loss": os.path.basename(loss_path),
+            "validation": os.path.basename(validation_path),
+            "hyperparameters": hyperparams,
+            "channels": model.summary,
+            "epochs": epochs
+        }
+        metadata_path = "train_metadata"
+        metadata_path = get_unique_path(save_folder, metadata_path, suffix=".json")
+        with open(metadata_path, 'w') as f:
+            f.write(json.dumps(metadata))
+
 

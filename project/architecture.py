@@ -10,6 +10,7 @@ class ConvNetPooling(nn.Module):
         input_size = 1 # we assume images are GS
         kernel_size = 4 # probably doesn't matter
         pooling_kernel = 2 # probbaly doesn't matter
+        self.summary = channels[::]
         i = 1
         for channel_count in channels:
             channel_count = int(channel_count)
@@ -18,6 +19,7 @@ class ConvNetPooling(nn.Module):
             dropout = nn.Dropout2d(p=0.2)
             pooling_layer = nn.MaxPool2d(pooling_kernel).to(device)
             self.conv_layers.append((conv_layer, relu, dropout, pooling_layer))
+            # self.conv_layers.append((conv_layer, relu, pooling_layer))
             height = (height - kernel_size + 1) // 2 # we assume no padding and stride=1
             width = (width - kernel_size + 1) // 2 # we assume no padding and stride=1
             input_size = channel_count
@@ -31,6 +33,7 @@ class ConvNetPooling(nn.Module):
     def forward(self, x):
         for layers in self.conv_layers:
             conv_layer, relu, dropout, pooling_layer = layers
+            # conv_layer, relu, pooling_layer = layers
             x = conv_layer(x)
             x = relu(x)
             x = dropout(x)
