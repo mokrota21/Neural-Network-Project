@@ -12,22 +12,15 @@ import numpy as np
 import torchvision
 import matplotlib.pyplot as plt
 import torchvision.transforms.functional as F
+import json
 
 device = torch.device("cuda")
 batch_size = 50
 cur_path = os.path.abspath(__file__)
-model_path = os.path.join(dir_path, 'model')
-file_name = ""
-for file in os.listdir(model_path):
-    if file.endswith("best.pth"):
-        file_name = file
-        tmp = file_name.split('_')
-        layers = [int(tmp[-3]), int(tmp[-2])]
-        break
-model_path = os.path.join(model_path, file_name)
-print(f"Using best model: {file_name}")
+model_path = os.path.join(dir_path, 'best_models', "best_reverse_pyramid", "cnn10.pth")
+metadata_path = os.path.join(os.path.dirname(model_path), 'train_metadata10.json')
 
-output_prefix = "emnist"
+output_prefix = "emnist_reverse_pyramid"
 save_path = os.path.join(dir_path, 'predictions')
 counter = 0
 folder_name = "{output_prefix}_visuals_{counter}"
@@ -46,14 +39,20 @@ dataset = EMNIST(root="data_emnist", split="letters", train=False, transform=to_
 labels = [label for _, label in dataset]
 output_size = len(set(labels))
 sample_image, sample_label = dataset[3]
-print(sample_label)
 # F.to_pil_image(F.hflip(F.rotate(sample_image, -90))).show()
 # F.to_pil_image(F.rotate(sample_image, -90)).show()
 _, width, height = list(sample_image.shape)
 trainloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-conv_net = ConvNetPooling(width=width, height=height, output=output_size, channels=layers)
-conv_net.load_state_dict(torch.load(model_path, weights_only=True))
+def load_model(model_path, metadata_path):
+    with open(metadata_path, 'r') as f:
+        metadata = json.load(f)
+    
+    model = ConvNetPooling(height, width, output_size, channels=metadata['channels'])
+    model.load_state_dict(torch.load(model_path, weights_only=True))
+    return model
+
+conv_net = load_model(model_path=model_path, metadata_path=metadata_path)
 dataiter = iter(trainloader)
 images, labels = next(dataiter)
 images = images.to(device)
