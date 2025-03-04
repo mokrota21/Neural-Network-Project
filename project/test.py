@@ -8,8 +8,14 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder, EMNIST
 import torchvision.transforms as transforms
+import json
+import numpy as np
+from sklearn.metrics import confusion_matrix
 
-load = True
+models_folder = os.path.join(dir_path, 'model')
+
+    
+
 device = torch.device("cuda")
 batch_size = 32
 cur_path = os.path.abspath(__file__)
@@ -27,24 +33,24 @@ testloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 label_mapping = [chr(ord('a') + i) for i in range(0, 26)]
 
-conv_net = ConvNetPooling(height=height, width=width, output=output_size, channels=[12, 12]).to(device)
-conv_net.load_state_dict(torch.load(save_path, map_location=device, weights_only=True))
 
-label_score = {}
-with torch.no_grad():
-    for image, label in testloader:
-        label = (label - 1).to(device)
-        image = image.to(device)
-        res = conv_net(image).to(device)
-        res = res.argmax(1)
-        for label_int, predict_int in zip(list(label), list(res)):
-            label_score[int(label_int)] = label_score.get(int(label_int), [0, 0])
-            label_score[int(label_int)][0] += int(predict_int == label_int)
-            label_score[int(label_int)][1] += 1
+def load_model(folder, no):
+    metadata_path = os.path.join(models_folder, folder, "train_metadata" + str(no) + ".json")
+    with open(metadata_path, 'r') as f:
+        metadata = json.load(f)
+    
+    model = ConvNetPooling(height=height, width=width, output=output_size, channels=metadata['channels'])
+    model_path = os.path.join(models_folder, folder, "cnn" + str(no) + '.pth')
+    model.load_state_dict(torch.load(model_path, weights_only=True))
+    return model
 
-sorted_scores = label_score.items()
-sorted_scores = sorted(sorted_scores, key= lambda x: x[1][0] / x[1][1])
-for item in sorted_scores:
-    positive, total = item[1]
-    key = item[0]
-    print(f"{label_mapping[int(key)]}: {positive / total * 100:.3f}%")
+folder = "training_reverse_pyramid0"
+no = 25
+conv_net = load_model(folder, no)
+
+from train import validation
+d = validation(conv_net, testloader, save_folder=None)
+predicted = d['predicted']
+expected = d['expected']
+
+print(confusion_matrix(expected, predicted))

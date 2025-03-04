@@ -20,7 +20,7 @@ def get_unique_path(path, name, suffix=""):
         new_path = os.path.join(path, name + str(counter) + suffix)
     return new_path
 
-descending = True
+descending = False
 device = torch.device("cuda")
 batch_size = 256
 validation_counter = 5
@@ -39,16 +39,11 @@ to_tensor = transforms.Compose([
     transforms.Grayscale(num_output_channels=1), transforms.ToTensor()
 ])
 dataset = EMNIST(root="data_emnist", split="letters", train=True, transform=to_tensor)
-
-torch.manual_seed(162179)
 train_dataset, validation_dataset = torch.utils.data.random_split(dataset, [0.8, 0.2])
-trainloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-validationloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False)
 
-def set_train_val(batch_size, split=[0.8, 0.2], seed=None):
+def set_train_val(batch_size, seed=None):
     if seed:
         torch.manual_seed(seed)
-    train_dataset, validation_dataset = torch.utils.data.random_split(dataset, split)
     trainloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     validationloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False)
     return trainloader, validationloader
@@ -71,9 +66,10 @@ def models_rand(n, channel_low, channel_high, exp_low, exp_high, num_l=2, width=
 
 
 
-def validation(model: ConvNetPooling, validationloader=validationloader, save_folder=save_path, seed=None):
+def validation(model: ConvNetPooling, validationloader, save_folder=save_path, seed=None):
     if seed:
         torch.manual_seed(seed)
+    model.eval()
     predicted = torch.tensor(data=[]).to(device)
     gt = torch.tensor(data=[]).to(device)
 
@@ -99,18 +95,19 @@ def validation(model: ConvNetPooling, validationloader=validationloader, save_fo
         path = get_unique_path(save_folder, path, suffix=".json")
         with open(path, 'w') as f:
             f.write(json.dumps(result))
+    model.train()
     return result
 
-def train(model: ConvNetPooling, hyperparams, trainloader=trainloader, validationloader=validationloader, save_folder=save_path, epochs=10, seed=None):
+def train(model: ConvNetPooling, hyperparams, batch_size, save_folder=save_path, epochs=10, seed=None):
     if seed:
         torch.manual_seed(seed)
     mse = nn.CrossEntropyLoss()
 
+    trainloader, validationloader = set_train_val(batch_size, seed)
     optimizer = torch.optim.Adam(params=model.parameters(), **hyperparams)
     loss_list = []
     for epoch in range(epochs):
         running_loss = 0.0
-        trainloader
         for i, data in enumerate(trainloader, 0):
             image, label = data
             label = (label - 1).to(device)

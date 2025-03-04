@@ -1,0 +1,1 @@
+{"model": "cnn13.pth", "loss": "loss13.json", "validation": "validation13.json", "hyperparameters": {"lr": 0.0009765625}, "channels": [13, 11], "epochs": 2}

@@ -1,0 +1,1 @@
+{"model": "cnn20.pth", "loss": "loss20.json", "validation": "validation20.json", "hyperparameters": {"lr": 0.0009765625}, "channels": [13, 11], "epochs": 20}
