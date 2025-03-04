@@ -58,8 +58,8 @@ output_size = len(set(labels))
 sample_image, _ = dataset[0]
 _, width, height = list(sample_image.shape)
 
-def models_rand(n, channel_low, channel_high, exp_low, exp_high, width=width, height=height):
-    conv_networks_parameters = [torch.randint(channel_low, channel_high, (2,)).sort(descending=descending).values for _ in range(n)]
+def models_rand(n, channel_low, channel_high, exp_low, exp_high, num_l=2, width=width, height=height):
+    conv_networks_parameters = [torch.randint(channel_low, channel_high, (num_l,)).sort(descending=descending).values for _ in range(n)]
     conv_networks = []
     for parameter in conv_networks_parameters:
         conv_networks.append(ConvNetPooling(height=height, width=width, output=output_size, channels=parameter.tolist()).cuda())
