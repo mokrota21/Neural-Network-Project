@@ -28,7 +28,6 @@ folder_path = os.path.join(save_path, folder_name.format(output_prefix=output_pr
 while os.path.exists(folder_path):
     counter += 1
     folder_path = os.path.join(save_path, folder_name.format(output_prefix=output_prefix, counter=counter))
-os.mkdir(folder_path)
 
 label_mapping = [chr(ord('a') + i) for i in range(0, 26)]
 
@@ -53,24 +52,52 @@ def load_model(model_path, metadata_path):
     return model
 
 conv_net = load_model(model_path=model_path, metadata_path=metadata_path)
-dataiter = iter(trainloader)
-images, labels = next(dataiter)
-images = images.to(device)
-conv_out = conv_net.show_conv(images)  # shape: [batch_size, 4, H, W]
+# dataiter = iter(trainloader)
+# images, labels = next(dataiter)
+# images = images.to(device)
+# conv_out = conv_net.show_conv(images)  # shape: [batch_size, 4, H, W]
 
-for image in range(conv_out[0].shape[0]):
-    counter = 0
-    img_folder_name = f'image_{image}'
-    img_folder_path = os.path.join(folder_path, img_folder_name)
-    os.mkdir(img_folder_path)
-    label = label_mapping[int(labels[image] - 1)]
-    original_path = os.path.join(img_folder_path, f"original_{label}.jpg")
-    F.to_pil_image(F.hflip(F.rotate(images[image], -90))).save(original_path)
-    for layer in range(len(conv_out)):
-        layer_out = conv_out[layer]
-        layer_path = os.path.join(img_folder_path, f"layer_{layer}")
-        os.mkdir(layer_path)
-        for channel in range(layer_out.shape[1]):
-            image_tensor = layer_out[image][channel].unsqueeze(0)
-            file_path = os.path.join(layer_path, f"visual_channel_{channel}.jpg")
-            F.to_pil_image(F.hflip(F.rotate(image_tensor, -90))).save(file_path)
+# for image in range(conv_out[0].shape[0]):
+#     counter = 0
+#     img_folder_name = f'image_{image}'
+#     img_folder_path = os.path.join(folder_path, img_folder_name)
+#     os.mkdir(img_folder_path)
+#     label = label_mapping[int(labels[image] - 1)]
+#     original_path = os.path.join(img_folder_path, f"original_{label}.jpg")
+#     F.to_pil_image(F.hflip(F.rotate(images[image], -90))).save(original_path)
+#     for layer in range(len(conv_out)):
+#         layer_out = conv_out[layer]
+#         layer_path = os.path.join(img_folder_path, f"layer_{layer}")
+#         os.mkdir(layer_path)
+#         for channel in range(layer_out.shape[1]):
+#             image_tensor = layer_out[image][channel].unsqueeze(0)
+#             file_path = os.path.join(layer_path, f"visual_channel_{channel}.jpg")
+#             F.to_pil_image(F.hflip(F.rotate(image_tensor, -90))).save(file_path)
+
+def visualise(model: ConvNetPooling, dataloader, path=folder_path):
+    if not os.path.exists(path):
+        os.mkdir(path)
+    dataiter = iter(dataloader)
+    images, labels = next(dataiter)
+    images = images.to(device)
+    conv_out = model.show_conv(images)  # shape: [batch_size, 4, H, W]
+
+    for image in range(conv_out[0].shape[0]):
+        counter = 0
+        img_folder_name = f'image_{image}'
+        img_folder_path = os.path.join(path, img_folder_name)
+        os.mkdir(img_folder_path)
+        label = label_mapping[int(labels[image] - 1)]
+        original_path = os.path.join(img_folder_path, f"original_{label}.jpg")
+        F.to_pil_image(F.hflip(F.rotate(images[image], -90))).save(original_path)
+        for layer in range(len(conv_out)):
+            layer_out = conv_out[layer]
+            layer_path = os.path.join(img_folder_path, f"layer_{layer}")
+            os.mkdir(layer_path)
+            for channel in range(layer_out.shape[1]):
+                image_tensor = layer_out[image][channel].unsqueeze(0)
+                file_path = os.path.join(layer_path, f"visual_channel_{channel}.jpg")
+                F.to_pil_image(F.hflip(F.rotate(image_tensor, -90))).save(file_path)
+
+    return conv_out
+
